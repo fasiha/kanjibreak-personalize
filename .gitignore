@@ -1,3 +1,6 @@
 .vscode/
 *.js
 node_modules/
+*.csv
+*.sqlite3
+*.sqlite
