@@ -36,7 +36,16 @@ function allDescendents(deps: Map<string, string[][]>, kanji: string): NodesEdge
   return {nodes, edges};
 }
 
-function graphToMarkdown(kanji: string, graph: NodesEdges<string>) {}
+// Doesn't print the first link in the cycle, i.e., 's -> q' not printed (from test)
+function graphToMarkdown(kanji: string, graph: NodesEdges<string>, seen: Set<string> = new Set([]),
+                         indent: number = 0): string {
+  const edges = graph.edges;
+  const hit = edges.get(kanji);
+  let header = ' '.repeat(indent) + '- ' + kanji + '\n';
+  seen.add(kanji);
+  if (!hit) { return header; }
+  return header + [...hit].filter(x => !seen.has(x)).map(k => graphToMarkdown(k, graph, seen, indent + 2)).join('\n');
+}
 
 function dependencyTableToMap(dependencies: string[][]): Map<string, string[][]> {
   let kanjiUserComponents: Map<string, Map<string, string[]>> = new Map([]);
