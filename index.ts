@@ -9,43 +9,26 @@ function setdiff<T>(arr: T[], set: Set<T>): T[] { return arr.filter(x => !set.ha
 const KANJIBREAK_CSV_FILE = "kanjibreak.csv";
 const CSV_SEP = ',';
 
-interface DeepArray<T> extends Array<T|DeepArray<T>> {}
-type Deep<T> = T|DeepArray<T>;
-
-function allDescendents(deps: Map<string, string[][]>, kanji: string, seen: Set<string> = new Set([])): Deep<string> {
-  let hit = deps.get(kanji);
-  if (!hit) { return []; }
-  let pieces = setdiff(flatten1(hit), seen);
-  if (pieces.length === 0) { return []; }
-  pieces.forEach(x => seen.add(x));
-  return pieces.map(x => {
-    let ret: Deep<string> = [x];
-    let kids = allDescendents(deps, x, seen);
-    if (kids.length) { ret.push(kids); }
-    return ret;
-  });
-}
-function allDescendents2(deps: Map<string, string[][]>,
-                         kanji: string): {nodes: Set<string>, edges: [string, string][]} {
-  let nodes: Set<string> = new Set([]);
-  let edges: Array<[string, string]> = []; // to -> from
-  let kanjis = [kanji];
-  let cousins: string[] = [];
-  do {
-    cousins = [];
-    for (let kanji of kanjis) {
+function allDescendents(deps: Map<string, string[][]>,
+                        kanji: string): {nodes: Set<string>, edges: Map<string, string[]>} {
+  let nodes: Set<string> = new Set([kanji]);
+  let edges: Map<string, string[]> = new Map([]);
+  let parents = [kanji];
+  while (parents.length > 0) {
+    let cousins: string[] = [];
+    for (let kanji of parents) {
       let hit = deps.get(kanji);
       if (!hit) { continue; }
       let kids = setdiff(flatten1(hit), nodes);
       if (kids.length === 0) { continue; }
       kids.forEach(kid => {
         nodes.add(kid);
-        edges.push([kanji, kid]);
+        edges.set(kanji, (edges.get(kanji) || []).concat(kid));
         cousins.push(kid);
       });
     }
-    kanjis = cousins;
-  } while (kanjis.length > 0);
+    parents = cousins;
+  }
   return {nodes, edges};
 }
 
