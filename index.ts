@@ -11,21 +11,22 @@ const CSV_SEP = ',';
 
 // this won't even indiciate the beginnings of circular paths, which hides descendants
 function allDescendents(deps: Map<string, string[][]>,
-                        kanji: string): {nodes: Set<string>, edges: Map<string, string[]>} {
+                        kanji: string): {nodes: Set<string>, edges: Map<string, Set<string>>} {
   let nodes: Set<string> = new Set([kanji]);
-  let edges: Map<string, string[]> = new Map([]);
+  let edges: Map<string, Set<string>> = new Map([]);
   let parents = [kanji];
   while (parents.length > 0) {
     let cousins: string[] = [];
     for (let kanji of parents) {
       let hit = deps.get(kanji);
       if (!hit) { continue; }
-      let kids = setdiff(flatten1(hit), nodes);
+      let kids = flatten1(hit).filter(x => x !== kanji); // no self-references
       if (kids.length === 0) { continue; }
       kids.forEach(kid => {
         nodes.add(kid);
-        edges.set(kanji, (edges.get(kanji) || []).concat(kid));
-        cousins.push(kid);
+        let tmp = edges.get(kanji) || new Set([]);
+        if (!tmp.has(kid)) { cousins.push(kid); }
+        edges.set(kanji, tmp.add(kid));
       });
     }
     parents = cousins;
@@ -66,3 +67,5 @@ if (require.main === module) {
     let kanjiComponents: Map<string, string[][]> = dependencyTableToMap(dependencies);
   })();
 }
+
+module.exports = {allDescendents};
