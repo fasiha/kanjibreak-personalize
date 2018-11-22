@@ -9,9 +9,11 @@ function setdiff<T>(arr: T[], set: Set<T>): T[] { return arr.filter(x => !set.ha
 const KANJIBREAK_CSV_FILE = "kanjibreak.csv";
 const CSV_SEP = ',';
 
-// this won't even indiciate the beginnings of circular paths, which hides descendants
-function allDescendents(deps: Map<string, string[][]>,
-                        kanji: string): {nodes: Set<string>, edges: Map<string, Set<string>>} {
+type NodesEdges<T> = {
+  nodes: Set<T>,
+  edges: Map<T, Set<T>>
+};
+function allDescendents(deps: Map<string, string[][]>, kanji: string): NodesEdges<string> {
   let nodes: Set<string> = new Set([kanji]);
   let edges: Map<string, Set<string>> = new Map([]);
   let parents = [kanji];
@@ -25,7 +27,7 @@ function allDescendents(deps: Map<string, string[][]>,
       kids.forEach(kid => {
         nodes.add(kid);
         let tmp = edges.get(kanji) || new Set([]);
-        if (!tmp.has(kid)) { cousins.push(kid); }
+        if (!tmp.has(kid)) { cousins.push(kid); } // don't walk down edges we've already traversed
         edges.set(kanji, tmp.add(kid));
       });
     }
@@ -34,7 +36,7 @@ function allDescendents(deps: Map<string, string[][]>,
   return {nodes, edges};
 }
 
-function graphToMarkdown(kanji: string, edges: Map<string, string[]>) {}
+function graphToMarkdown(kanji: string, graph: NodesEdges<string>) {}
 
 function dependencyTableToMap(dependencies: string[][]): Map<string, string[][]> {
   let kanjiUserComponents: Map<string, Map<string, string[]>> = new Map([]);
