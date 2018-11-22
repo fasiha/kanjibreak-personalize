@@ -9,6 +9,7 @@ function setdiff<T>(arr: T[], set: Set<T>): T[] { return arr.filter(x => !set.ha
 const KANJIBREAK_CSV_FILE = "kanjibreak.csv";
 const CSV_SEP = ',';
 
+// this won't even indiciate the beginnings of circular paths, which hides descendants
 function allDescendents(deps: Map<string, string[][]>,
                         kanji: string): {nodes: Set<string>, edges: Map<string, string[]>} {
   let nodes: Set<string> = new Set([kanji]);
