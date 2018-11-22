@@ -39,7 +39,7 @@ function allDescendents(deps: Map<string, string[][]>, kanji: string): NodesEdge
 function graphToMarkdown(kanji: string, graph: NodesEdges<string>, visitedNodes: Set<string> = new Set([]),
                          indent: number = 0): string {
   let header = ' '.repeat(indent) + '- ' + kanji;
-  if (visitedNodes.has(kanji)) { return header; }
+  if (visitedNodes.has(kanji)) { return header + ' (repeat breakdown omitted)'; }
   visitedNodes.add(kanji);
 
   const edges = graph.edges;
