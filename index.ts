@@ -81,4 +81,7 @@ if (require.main === module) {
   })();
 }
 
-module.exports = {allDescendents};
+module.exports = {
+  allDescendents,
+  graphToMarkdown
+};
