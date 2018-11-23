@@ -4,9 +4,7 @@ import {promisify} from 'util';
 const existsPromise = promisify(exists);
 const readFilePromise = promisify(readFile);
 function flatten1<T>(v: T[][]): T[] { return v.reduce((prev, curr) => prev.concat(curr), []); };
-function setdiff<T>(arr: T[], set: Set<T>): T[] { return arr.filter(x => !set.has(x)); };
 
-const KANJIBREAK_CSV_FILE = "kanjibreak.csv";
 const CSV_SEP = ',';
 
 type NodesEdges<T> = {
@@ -67,10 +65,26 @@ function dependencyTableToMap(dependencies: string[][]): Map<string, string[][]>
   return kanjiComponents;
 }
 
+const USAGE = `USAGE: invoke as:
+
+$ echo "制作の日本" | node index.js KANJIBREAK.CSV
+
+OR
+
+$ node index.js KANJIBREAK.CSV "制作の日本"
+
+to see the Markdown output.
+`;
 if (require.main === module) {
   (async function main() {
-    if (!await existsPromise(KANJIBREAK_CSV_FILE)) { throw new Error('cannot find input file'); }
-    const raw = await readFilePromise(KANJIBREAK_CSV_FILE, 'utf8');
+    const [_1, _2, kanjibreakCsv, inputText]: (string|undefined)[] = process.argv;
+
+    if (!kanjibreakCsv) {
+      console.log(USAGE);
+      process.exit(1);
+    }
+    if (!await existsPromise(kanjibreakCsv)) { throw new Error('cannot read input file, ' + kanjibreakCsv); }
+    const raw = await readFilePromise(kanjibreakCsv, 'utf8');
     const sections = raw.trim().split('\n\n');
     if (sections.length !== 3) { throw new Error('three sections expected: "me", metadata, and dependency'); }
 
@@ -79,15 +93,22 @@ if (require.main === module) {
     const dependencies = dependencySection.trim().split('\n').map(line => line.split(CSV_SEP));
     let kanjiComponents: Map<string, string[][]> = dependencyTableToMap(dependencies);
 
-    console.error('[waiting for stdin]');
-    let seen: Set<string> = new Set([]);
     const hanRegexp =
         /[\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B\u3400-\u4DB5\u4E00-\u9FEF\uF900-\uFA6D\uFA70-\uFAD9]/g;
-    process.stdin.on('data', (line: Buffer) => {
-      let kanjis = [...new Set(line.toString('utf8').match(hanRegexp))].filter(k => !seen.has(k));
-      kanjis.forEach(k => seen.add(k));
-      console.log(kanjis.map(k => graphToMarkdown(k, allDescendents(kanjiComponents, k))).join('\n\n'));
-    });
+    if (inputText) {
+      for (let k of new Set(inputText.match(hanRegexp))) {
+        console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k)));
+        console.log('');
+      }
+    } else {
+      console.error('[waiting for stdin]');
+      let seen: Set<string> = new Set([]);
+      process.stdin.on('data', (line: Buffer) => {
+        let kanjis = [...new Set(line.toString('utf8').match(hanRegexp))].filter(k => !seen.has(k));
+        kanjis.forEach(k => seen.add(k));
+        console.log(kanjis.map(k => graphToMarkdown(k, allDescendents(kanjiComponents, k))).join('\n\n'));
+      });
+    }
   })();
 }
 
