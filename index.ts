@@ -45,15 +45,16 @@ function allDescendents(deps: Map<string, string[][]>, kanji: string): NodesEdge
   return {nodes, edges};
 }
 
-function graphToMarkdown(kanji: string, graph: NodesEdges<string>, visitedNodes: Set<string> = new Set([]),
-                         indent: number = 0): string {
-  let header = ' '.repeat(indent) + '- ' + kanji;
+function graphToMarkdown(kanji: string, graph: NodesEdges<string>, kanjiPrinter: ((s: string) => string) = s => s,
+                         visitedNodes: Set<string> = new Set([]), indent: number = 0): string {
+  let header = ' '.repeat(indent) + '- ' + kanjiPrinter(kanji);
   if (visitedNodes.has(kanji)) { return header + ' (repeat breakdown omitted)'; }
   visitedNodes.add(kanji);
 
   const hit = graph.edges.get(kanji);
   if (!hit) { return header; }
-  let ret = header + '\n' + [...hit].map(k => graphToMarkdown(k, graph, visitedNodes, indent + 2)).join('\n');
+  let ret =
+      header + '\n' + [...hit].map(k => graphToMarkdown(k, graph, kanjiPrinter, visitedNodes, indent + 2)).join('\n');
   return ret;
 }
 
@@ -101,11 +102,17 @@ if (require.main === module) {
     const dependencies = dependencySection.trim().split('\n').map(line => line.split(CSV_SEP));
     let kanjiComponents: Map<string, string[][]> = dependencyTableToMap(dependencies);
 
+    const kankenYearToKanjis: Map<number, string> = new Map(
+        Object.entries(JSON.parse(await readFilePromise('kanken.json', 'utf8'))).map(v => [+v[0], v[1]]) as any);
+    const kankenKanjiToYear: Map<string, number> = new Map([]);
+    for (let [year, kanjis] of kankenYearToKanjis) { kanjis.split('').forEach(k => kankenKanjiToYear.set(k, year)); }
+    const kankenPrinter = (k: string) => k + (kankenKanjiToYear.has(k) ? ` (Kanken ${kankenKanjiToYear.get(k)})` : '');
+
     const hanRegexp =
         /[\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B\u3400-\u4DB5\u4E00-\u9FEF\uF900-\uFA6D\uFA70-\uFAD9]/g;
     if (inputText) {
       for (let k of new Set(inputText.match(hanRegexp))) {
-        console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k)));
+        console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k), kankenPrinter));
         console.log('');
       }
     } else {
@@ -113,8 +120,11 @@ if (require.main === module) {
       let seen: Set<string> = new Set([]);
       process.stdin.on('data', (line: Buffer) => {
         let kanjis = [...new Set(line.toString('utf8').match(hanRegexp))].filter(k => !seen.has(k));
-        kanjis.forEach(k => seen.add(k));
-        console.log(kanjis.map(k => graphToMarkdown(k, allDescendents(kanjiComponents, k))).join('\n\n'));
+        for (let k of kanjis) {
+          seen.add(k);
+          console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k), kankenPrinter));
+          console.log('');
+        }
       });
     }
   })();
