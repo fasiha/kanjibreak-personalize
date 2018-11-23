@@ -42,8 +42,7 @@ function graphToMarkdown(kanji: string, graph: NodesEdges<string>, visitedNodes:
   if (visitedNodes.has(kanji)) { return header + ' (repeat breakdown omitted)'; }
   visitedNodes.add(kanji);
 
-  const edges = graph.edges;
-  const hit = edges.get(kanji);
+  const hit = graph.edges.get(kanji);
   if (!hit) { return header; }
   let ret = header + '\n' + [...hit].map(k => graphToMarkdown(k, graph, visitedNodes, indent + 2)).join('\n');
   return ret;
@@ -75,9 +74,20 @@ if (require.main === module) {
     const sections = raw.trim().split('\n\n');
     if (sections.length !== 3) { throw new Error('three sections expected: "me", metadata, and dependency'); }
 
-    // const metadata = sections[1].trim().split('\n').map(line => line.split(CSV_SEP)).map(v => [v[0], +v[1], +v[2]]);
-    const dependencies = sections[2].trim().split('\n').map(line => line.split(CSV_SEP));
+    const dependencySection = sections.find(s => s.startsWith('target,user'));
+    if (!dependencySection) { throw new Error('could not find dependency table'); }
+    const dependencies = dependencySection.trim().split('\n').map(line => line.split(CSV_SEP));
     let kanjiComponents: Map<string, string[][]> = dependencyTableToMap(dependencies);
+
+    console.error('[waiting for stdin]');
+    let seen: Set<string> = new Set([]);
+    const hanRegexp =
+        /[\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B\u3400-\u4DB5\u4E00-\u9FEF\uF900-\uFA6D\uFA70-\uFAD9]/g;
+    process.stdin.on('data', (line: Buffer) => {
+      let kanjis = [...new Set(line.toString('utf8').match(hanRegexp))].filter(k => !seen.has(k));
+      kanjis.forEach(k => seen.add(k));
+      console.log(kanjis.map(k => graphToMarkdown(k, allDescendents(kanjiComponents, k))).join('\n\n'));
+    });
   })();
 }
 
