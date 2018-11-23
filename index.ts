@@ -84,13 +84,20 @@ if (require.main === module) {
       console.log(USAGE);
       process.exit(1);
     }
-    if (!await existsPromise(kanjibreakCsv)) { throw new Error('cannot read input file, ' + kanjibreakCsv); }
+    if (!await existsPromise(kanjibreakCsv)) {
+      console.log('ERROR: cannot read input file, ' + kanjibreakCsv);
+      process.exit(1);
+    }
     const raw = await readFilePromise(kanjibreakCsv, 'utf8');
     const sections = raw.trim().split('\n\n');
     if (sections.length !== 3) { throw new Error('three sections expected: "me", metadata, and dependency'); }
 
     const dependencySection = sections.find(s => s.startsWith('target,user'));
-    if (!dependencySection) { throw new Error('could not find dependency table'); }
+    if (!dependencySection) {
+      console.error('ERROR: could not find dependency table in ' + kanjibreakCsv);
+      process.exit(1);
+      return;
+    }
     const dependencies = dependencySection.trim().split('\n').map(line => line.split(CSV_SEP));
     let kanjiComponents: Map<string, string[][]> = dependencyTableToMap(dependencies);
 
