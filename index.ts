@@ -1,3 +1,14 @@
+const USAGE = `USAGE: invoke as:
+
+$ echo "制作の日本" | node index.js KANJIBREAK.CSV
+
+OR
+
+$ node index.js KANJIBREAK.CSV "制作の日本"
+
+to see the Markdown output.
+`;
+
 import {exists, readFile} from 'fs';
 import {promisify} from 'util';
 
@@ -65,19 +76,9 @@ function dependencyTableToMap(dependencies: string[][]): Map<string, string[][]>
   return kanjiComponents;
 }
 
-const USAGE = `USAGE: invoke as:
-
-$ echo "制作の日本" | node index.js KANJIBREAK.CSV
-
-OR
-
-$ node index.js KANJIBREAK.CSV "制作の日本"
-
-to see the Markdown output.
-`;
 if (require.main === module) {
   (async function main() {
-    const [_1, _2, kanjibreakCsv, inputText]: (string|undefined)[] = process.argv;
+    const [kanjibreakCsv, inputText]: (string|undefined)[] = process.argv.slice(2);
 
     if (!kanjibreakCsv) {
       console.log(USAGE);

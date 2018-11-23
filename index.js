@@ -8,6 +8,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const USAGE = `USAGE: invoke as:
+
+$ echo "制作の日本" | node index.js KANJIBREAK.CSV
+
+OR
+
+$ node index.js KANJIBREAK.CSV "制作の日本"
+
+to see the Markdown output.
+`;
 const fs_1 = require("fs");
 const util_1 = require("util");
 const existsPromise = util_1.promisify(fs_1.exists);
@@ -76,20 +86,10 @@ function dependencyTableToMap(dependencies) {
     }
     return kanjiComponents;
 }
-const USAGE = `USAGE: invoke as:
-
-$ echo "制作の日本" | node index.js KANJIBREAK.CSV
-
-OR
-
-$ node index.js KANJIBREAK.CSV "制作の日本"
-
-to see the Markdown output.
-`;
 if (require.main === module) {
     (function main() {
         return __awaiter(this, void 0, void 0, function* () {
-            const [_1, _2, kanjibreakCsv, inputText] = process.argv;
+            const [kanjibreakCsv, inputText] = process.argv.slice(2);
             if (!kanjibreakCsv) {
                 console.log(USAGE);
                 process.exit(1);
