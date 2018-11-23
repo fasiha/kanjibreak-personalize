@@ -7,8 +7,8 @@
     "test": "tape test*js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Ahmed Fasih",
+  "license": "Unlicense",
   "devDependencies": {
     "@types/node": "^10.12.9",
     "tape": "^4.9.1",
