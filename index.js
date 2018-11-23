@@ -89,20 +89,33 @@ function dependencyTableToMap(dependencies) {
 if (require.main === module) {
     (function main() {
         return __awaiter(this, void 0, void 0, function* () {
+            // Parse inputs
             const [kanjibreakCsv, inputText] = process.argv.slice(2);
             if (!kanjibreakCsv) {
                 console.log(USAGE);
                 process.exit(1);
             }
+            // Slurp CSV file from KanjiBreak
             if (!(yield existsPromise(kanjibreakCsv))) {
                 console.log('ERROR: cannot read input file, ' + kanjibreakCsv);
                 process.exit(1);
             }
             const raw = yield readFilePromise(kanjibreakCsv, 'utf8');
             const sections = raw.trim().split('\n\n');
-            if (sections.length !== 3) {
-                throw new Error('three sections expected: "me", metadata, and dependency');
+            // Extract metadata table (allowed kanji, primitives, etc.)
+            const metadataSection = sections.find(s => s.startsWith('target,primitive,kanji'));
+            if (!metadataSection) {
+                console.error('ERROR: could not find metadata table in ' + kanjibreakCsv);
+                process.exit(1);
+                return;
             }
+            const metadata = metadataSection.trim()
+                .split('\n')
+                .map(line => line.split(CSV_SEP))
+                .map(v => [v[0], !!(+v[1]), !!(+v[2])]);
+            const valueIsPrimitive = new Set(metadata.filter(([_, p]) => p).map(([k]) => k));
+            const valueIsKanji = new Set(metadata.filter(([_, _2, k]) => k).map(([k]) => k));
+            // Extract dependency table
             const dependencySection = sections.find(s => s.startsWith('target,user'));
             if (!dependencySection) {
                 console.error('ERROR: could not find dependency table in ' + kanjibreakCsv);
@@ -111,13 +124,19 @@ if (require.main === module) {
             }
             const dependencies = dependencySection.trim().split('\n').map(line => line.split(CSV_SEP));
             let kanjiComponents = dependencyTableToMap(dependencies);
+            // Load Kanji Kentei (kanken) data
             const kankenYearToKanjis = new Map(Object.entries(JSON.parse(yield readFilePromise('kanken.json', 'utf8'))).map(v => [+v[0], v[1]]));
             const kankenKanjiToYear = new Map([]);
             for (let [year, kanjis] of kankenYearToKanjis) {
                 kanjis.split('').forEach(k => kankenKanjiToYear.set(k, year));
             }
-            const kankenPrinter = (k) => k + (kankenKanjiToYear.has(k) ? ` (Kanken ${kankenKanjiToYear.get(k)})` : '');
+            // Function to nicely annotate a kanji, given metadata and Kanken data above
+            const kankenPrinter = (k) => k + (valueIsPrimitive.has(k) && " (primitive)" || "") +
+                (valueIsKanji.has(k) && " (kanji)" || "") +
+                (kankenKanjiToYear.has(k) ? ` (Kanken ${kankenKanjiToYear.get(k)})` : '');
+            // Prepare to parse input text
             const hanRegexp = /[\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B\u3400-\u4DB5\u4E00-\u9FEF\uF900-\uFA6D\uFA70-\uFAD9]/g;
+            // Text given as an argument?
             if (inputText) {
                 for (let k of new Set(inputText.match(hanRegexp))) {
                     console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k), kankenPrinter));
@@ -125,6 +144,7 @@ if (require.main === module) {
                 }
             }
             else {
+                // Text piped into stdin
                 console.error('[waiting for stdin]');
                 let seen = new Set([]);
                 process.stdin.on('data', (line) => {
