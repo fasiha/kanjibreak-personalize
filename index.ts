@@ -11,12 +11,10 @@ to see the Markdown output.
 
 import {exists, readFile, writeFile} from 'fs';
 import {promisify} from 'util';
-import fetch from 'node-fetch';
 import sqlite from 'sqlite3';
 
 const existsPromise = promisify(exists);
 const readFilePromise = promisify(readFile);
-const writeFilePromise = promisify(writeFile);
 
 type NodesEdges<T> = {
   nodes: Set<T>,
@@ -67,15 +65,6 @@ function databaseToMetadata(db: sqlite.Database) {
     if (row.kanji) { valueIsKanji.add(row.target); }
   });
   return {valueIsPrimitive, valueIsKanji};
-}
-
-async function verifyExistsOrDownload(sqliteFilepath = 'kanjibreak.sqlite3'): Promise<boolean> {
-  if (!existsPromise(sqliteFilepath)) {
-    await fetch('https://kanjibreak.glitch.me/api/exportdb')
-        .then(x => x.arrayBuffer())
-        .then(x => writeFilePromise(sqliteFilepath, Buffer.from(x)))
-  }
-  return true;
 }
 
 if (require.main === module) {
