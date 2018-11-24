@@ -9,7 +9,7 @@ $ node index.js KANJIBREAK.CSV "制作の日本"
 to see the Markdown output.
 `;
 
-import {exists, readFile, writeFile} from 'fs';
+import {exists, readFile} from 'fs';
 import {promisify} from 'util';
 import sqlite from 'sqlite3';
 
