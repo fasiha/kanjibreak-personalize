@@ -14,7 +14,7 @@ or equivalently
 $ echo "制作の日本" | node.js kanjibreak.sqlite3
 ```
 
-This will output the following Markdown (note that "Kanken" refers to [Kanji Kentei (Wikipedia)](https://en.wikipedia.org/wiki/Kanji_Kentei)):
+This currently outputs the following Markdown (note that "Kanken" refers to [Kanji Kentei (Wikipedia)](https://en.wikipedia.org/wiki/Kanji_Kentei); and as more kanji get breakdowns added to KanjiBreak, this will improve):
 
 - 制 (kanji) (Kanken 6)
 
