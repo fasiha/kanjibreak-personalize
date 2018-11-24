@@ -7,6 +7,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const USAGE = `USAGE: invoke as:
 
@@ -20,41 +23,11 @@ to see the Markdown output.
 `;
 const fs_1 = require("fs");
 const util_1 = require("util");
+const sqlite3_1 = __importDefault(require("sqlite3"));
 const existsPromise = util_1.promisify(fs_1.exists);
 const readFilePromise = util_1.promisify(fs_1.readFile);
-function flatten1(v) { return v.reduce((prev, curr) => prev.concat(curr), []); }
-;
-const CSV_SEP = ',';
-function allDescendents(deps, kanji) {
-    let nodes = new Set([kanji]);
-    let edges = new Map([]);
-    let parents = [kanji];
-    while (parents.length > 0) {
-        let cousins = [];
-        for (let kanji of parents) {
-            let hit = deps.get(kanji);
-            if (!hit) {
-                continue;
-            }
-            let kids = flatten1(hit).filter(x => x !== kanji); // no self-references
-            if (kids.length === 0) {
-                continue;
-            }
-            kids.forEach(kid => {
-                nodes.add(kid);
-                let tmp = edges.get(kanji) || new Set([]);
-                if (!tmp.has(kid)) {
-                    cousins.push(kid);
-                } // don't walk down edges we've already traversed
-                edges.set(kanji, tmp.add(kid));
-            });
-        }
-        parents = cousins;
-    }
-    return { nodes, edges };
-}
 function graphToMarkdown(kanji, graph, kanjiPrinter = s => s, visitedNodes = new Set([]), indent = 0) {
-    let header = ' '.repeat(indent) + '- ' + kanjiPrinter(kanji);
+    const header = ' '.repeat(indent) + '- ' + kanjiPrinter(kanji);
     if (visitedNodes.has(kanji)) {
         return header + ' (repeat breakdown omitted)';
     }
@@ -63,67 +36,80 @@ function graphToMarkdown(kanji, graph, kanjiPrinter = s => s, visitedNodes = new
     if (!hit) {
         return header;
     }
-    let ret = header + '\n' + [...hit].map(k => graphToMarkdown(k, graph, kanjiPrinter, visitedNodes, indent + 2)).join('\n');
-    return ret;
+    const ret = [...hit]
+        .filter(x => x !== kanji)
+        .map(k => graphToMarkdown(k, graph, kanjiPrinter, visitedNodes, indent + 2))
+        .join('\n');
+    return header + (ret ? '\n' + ret : '');
 }
-function dependencyTableToMap(dependencies) {
-    let kanjiUserComponents = new Map([]);
-    for (let [kanji, user, component] of dependencies) {
-        if (kanjiUserComponents.has(kanji)) {
-            let userComponents = kanjiUserComponents.get(kanji);
-            if (!userComponents) {
-                throw new Error('typescript pacification');
-            }
-            userComponents.set(user, (userComponents.get(user) || []).concat(component));
+function databaseToGraph(db) {
+    let nodes = new Set([]);
+    let edges = new Map([]);
+    db.each("SELECT * FROM deps", (err, row) => {
+        if (err) {
+            throw new Error('' + err);
         }
-        else {
-            kanjiUserComponents.set(kanji, new Map([[user, [component]]]));
+        if (!(row.hasOwnProperty('target') && row.hasOwnProperty('dependency'))) {
+            throw new Error('malformed row in `deps`');
         }
-    }
-    let kanjiComponents = new Map([]);
-    for (let [kanji, userComponents] of kanjiUserComponents) {
-        kanjiComponents.set(kanji, Array.from(userComponents).map(([_, components]) => components));
-    }
-    return kanjiComponents;
+        nodes.add(row.target);
+        if (true || row.target !== row.dependency) { // don't allow self-references
+            nodes.add(row.dependency);
+            edges.set(row.target, (edges.get(row.target) || new Set([])).add(row.dependency));
+        }
+    });
+    return { nodes, edges };
+}
+function databaseToMetadata(db) {
+    let valueIsPrimitive = new Set([]);
+    let valueIsKanji = new Set([]);
+    db.each("SELECT * FROM targets", (err, row) => {
+        if (err) {
+            throw new Error('' + err);
+        }
+        if (!(row.hasOwnProperty('target') && row.hasOwnProperty('primitive') && row.hasOwnProperty('kanji'))) {
+            throw new Error('malformed row in `targets`');
+        }
+        if (row.primitive) {
+            valueIsPrimitive.add(row.target);
+        }
+        if (row.kanji) {
+            valueIsKanji.add(row.target);
+        }
+    });
+    return { valueIsPrimitive, valueIsKanji };
 }
 if (require.main === module) {
     (function main() {
         return __awaiter(this, void 0, void 0, function* () {
             // Parse inputs
-            const [kanjibreakCsv, inputText] = process.argv.slice(2);
-            if (!kanjibreakCsv) {
+            const [KANJIBREAK_SQLITE, inputText] = process.argv.slice(2);
+            if (!KANJIBREAK_SQLITE) {
                 console.log(USAGE);
                 process.exit(1);
             }
-            // Slurp CSV file from KanjiBreak
-            if (!(yield existsPromise(kanjibreakCsv))) {
-                console.log('ERROR: cannot read input file, ' + kanjibreakCsv);
+            if (!(yield existsPromise(KANJIBREAK_SQLITE))) {
+                console.log('ERROR: cannot read input file, ' + KANJIBREAK_SQLITE);
                 process.exit(1);
             }
-            const raw = yield readFilePromise(kanjibreakCsv, 'utf8');
-            const sections = raw.trim().split('\n\n');
-            // Extract metadata table (allowed kanji, primitives, etc.)
-            const metadataSection = sections.find(s => s.startsWith('target,primitive,kanji'));
-            if (!metadataSection) {
-                console.error('ERROR: could not find metadata table in ' + kanjibreakCsv);
-                process.exit(1);
-                return;
-            }
-            const metadata = metadataSection.trim()
-                .split('\n')
-                .map(line => line.split(CSV_SEP))
-                .map(v => [v[0], !!(+v[1]), !!(+v[2])]);
-            const valueIsPrimitive = new Set(metadata.filter(([_, p]) => p).map(([k]) => k));
-            const valueIsKanji = new Set(metadata.filter(([_, _2, k]) => k).map(([k]) => k));
-            // Extract dependency table
-            const dependencySection = sections.find(s => s.startsWith('target,user'));
-            if (!dependencySection) {
-                console.error('ERROR: could not find dependency table in ' + kanjibreakCsv);
-                process.exit(1);
-                return;
-            }
-            const dependencies = dependencySection.trim().split('\n').map(line => line.split(CSV_SEP));
-            let kanjiComponents = dependencyTableToMap(dependencies);
+            // Load database
+            let db = new sqlite3_1.default.Database(KANJIBREAK_SQLITE, err => {
+                if (err) {
+                    throw new Error('failed to open ' + KANJIBREAK_SQLITE);
+                }
+            });
+            // Extract metadata and dependencies tables
+            const { valueIsPrimitive, valueIsKanji } = databaseToMetadata(db);
+            const graph = databaseToGraph(db);
+            // Wait for all database queries to finish
+            yield new Promise((resolve, reject) => {
+                db.close(e => {
+                    if (e) {
+                        reject(e);
+                    }
+                    resolve();
+                });
+            });
             // Load Kanji Kentei (kanken) data
             const kankenYearToKanjis = new Map(Object.entries(JSON.parse(yield readFilePromise('kanken.json', 'utf8'))).map(v => [+v[0], v[1]]));
             const kankenKanjiToYear = new Map([]);
@@ -139,7 +125,7 @@ if (require.main === module) {
             // Text given as an argument?
             if (inputText) {
                 for (let k of new Set(inputText.match(hanRegexp))) {
-                    console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k), kankenPrinter));
+                    console.log(graphToMarkdown(k, graph, kankenPrinter));
                     console.log('');
                 }
             }
@@ -151,7 +137,7 @@ if (require.main === module) {
                     let kanjis = [...new Set(line.toString('utf8').match(hanRegexp))].filter(k => !seen.has(k));
                     for (let k of kanjis) {
                         seen.add(k);
-                        console.log(graphToMarkdown(k, allDescendents(kanjiComponents, k), kankenPrinter));
+                        console.log(graphToMarkdown(k, graph, kankenPrinter));
                         console.log('');
                     }
                 });
@@ -159,7 +145,4 @@ if (require.main === module) {
         });
     })();
 }
-module.exports = {
-    allDescendents,
-    graphToMarkdown
-};
+module.exports = { graphToMarkdown };
