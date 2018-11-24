@@ -2,16 +2,30 @@
 const test = require('tape');
 const mod = require('./index');
 
-let tmap = new Map([
-  ['q-fq', [['q', 'fq']]],
-  ['q', [['d']]],
-  ['d', [['s']]],
-  ['s', [['q'], ['s']]],
-  ['fq', [['q', 'f']]],
-]);
+let graph = {
+  edges: new Map([
+    ['q-fq', new Set(['q', 'fq'])],
+    ['q', new Set(['d'])],
+    ['d', new Set(['s'])],
+    [
+      's', new Set([
+        'q',
+        // 's' // ignore self loops
+      ])
+    ],
+    ['fq', new Set(['q', 'f'])],
+  ]),
+  nodes: new Set([
+    'q-fq',
+    'q',
+    'fq',
+    'd',
+    's',
+    'f',
+  ])
+};
 
 test('descender', t => {
-  let graph = mod.allDescendents(tmap, 'q-fq')
   t.equal(graph.nodes.size, 6, "found all nodes");
   t.ok(graph.edges.has('s'), "edge out of s");
   t.ok(graph.edges.get('s').has('q'), "edge between s and q (loop)");
@@ -20,7 +34,6 @@ test('descender', t => {
 })
 
 test('printer', t => {
-  let graph = mod.allDescendents(tmap, 'q-fq')
   let printed = mod.graphToMarkdown('q-fq', graph);
   t.comment(JSON.stringify(printed));
   t.ok(printed.indexOf('\n\n') < 0, "no repeated newlines");
