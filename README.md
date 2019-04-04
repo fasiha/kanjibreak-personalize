@@ -11,7 +11,7 @@ $ node index.js kanjibreak.sqlite3 "制作の日本"
 ```
 or equivalently
 ```
-$ echo "制作の日本" | node.js kanjibreak.sqlite3
+$ echo "制作の日本" | node index.js kanjibreak.sqlite3
 ```
 
 This currently outputs the following Markdown (note that "Kanken" refers to [Kanji Kentei (Wikipedia)](https://en.wikipedia.org/wiki/Kanji_Kentei); and as more kanji get breakdowns added to KanjiBreak, this will improve):
@@ -37,6 +37,8 @@ This currently outputs the following Markdown (note that "Kanken" refers to [Kan
 - 本 (primitive) (kanji) (Kanken 10)
   - 一 (primitive) (kanji) (Kanken 10)
   - 木 (primitive) (kanji) (Kanken 10)
+
+**N.B.** If you pipe text into Node (the second usage above, something like `cat file | node.js index.js kanjibreak.sqlite3`), the above output will be augmented by the first line in the input that uses each kanji.
 
 ## Rationale
 
