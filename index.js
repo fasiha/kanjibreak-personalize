@@ -13,11 +13,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const USAGE = `USAGE: invoke as:
 
-$ echo "制作の日本" | node index.js KANJIBREAK.CSV
+$ echo "制作の日本" | node index.js KANJIBREAK.SQLITE3
 
 OR
 
-$ node index.js KANJIBREAK.CSV "制作の日本"
+$ node index.js KANJIBREAK.SQLITE3 "制作の日本"
 
 to see the Markdown output.
 `;
@@ -116,14 +116,14 @@ if (require.main === module) {
             for (let [year, kanjis] of kankenYearToKanjis) {
                 kanjis.split('').forEach(k => kankenKanjiToYear.set(k, year));
             }
-            // Function to nicely annotate a kanji, given metadata and Kanken data above
-            const kankenPrinter = (k) => k + (valueIsPrimitive.has(k) && " (primitive)" || "") +
-                (valueIsKanji.has(k) && " (kanji)" || "") +
-                (kankenKanjiToYear.has(k) ? ` (Kanken ${kankenKanjiToYear.get(k)})` : '');
             // Prepare to parse input text
             const hanRegexp = /[\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B\u3400-\u4DB5\u4E00-\u9FEF\uF900-\uFA6D\uFA70-\uFAD9]/g;
             // Text given as an argument?
             if (inputText) {
+                // Function to nicely annotate a kanji, given metadata and Kanken data above
+                const kankenPrinter = (k) => k + (valueIsPrimitive.has(k) && " (primitive)" || "") +
+                    (valueIsKanji.has(k) && " (kanji)" || "") +
+                    (kankenKanjiToYear.has(k) ? ` (Kanken ${kankenKanjiToYear.get(k)})` : '');
                 for (let k of new Set(inputText.match(hanRegexp))) {
                     console.log(graphToMarkdown(k, graph, kankenPrinter));
                     console.log('');
@@ -132,11 +132,25 @@ if (require.main === module) {
             else {
                 // Text piped into stdin
                 console.error('[waiting for stdin]');
-                let seen = new Set([]);
-                process.stdin.on('data', (line) => {
-                    let kanjis = [...new Set(line.toString('utf8').match(hanRegexp))].filter(k => !seen.has(k));
-                    for (let k of kanjis) {
-                        seen.add(k);
+                let seen = new Map([]);
+                let ordered = [];
+                // Function to nicely annotate a kanji, given metadata and Kanken data above
+                const kankenPrinter = (k) => k + (valueIsPrimitive.has(k) && " (primitive)" || "") +
+                    (valueIsKanji.has(k) && " (kanji)" || "") +
+                    (kankenKanjiToYear.has(k) ? ` (Kanken ${kankenKanjiToYear.get(k)})` : '') +
+                    (seen.has(k) ? ': ' + seen.get(k) : '');
+                process.stdin.on('data', (buf) => {
+                    const lines = buf.toString('utf8').split('\n');
+                    for (const line of lines) {
+                        let kanjis = [...new Set(line.match(hanRegexp))].filter(k => !seen.has(k));
+                        for (let k of kanjis) {
+                            seen.set(k, line);
+                        }
+                        ordered = ordered.concat(kanjis);
+                    }
+                });
+                process.stdin.on('end', () => {
+                    for (let k of ordered) {
                         console.log(graphToMarkdown(k, graph, kankenPrinter));
                         console.log('');
                     }
